@@ -14,6 +14,11 @@ st.markdown(
     <style>
         .stApp {
             background: linear-gradient(135deg, #fff4b3 0%, #ffd7e8 45%, #dfeeff 100%);
+            color-scheme: light;
+        }
+        [data-testid="stAppViewContainer"] {
+            background: linear-gradient(135deg, #fff4b3 0%, #ffd7e8 45%, #dfeeff 100%);
+            color-scheme: light;
         }
         .block-container {
             padding-top: 2rem;
