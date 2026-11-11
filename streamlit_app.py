@@ -31,6 +31,15 @@ st.markdown(
             color: #5c2a9d;
             margin-bottom: 1rem;
         }
+        .stMarkdown, .stTextInput, .stForm, .stButton, .stSubheader, .stSuccess, .stWarning {
+            color: #000000 !important;
+        }
+        .stTextInput label {
+            color: #000000 !important;
+        }
+        .stForm p {
+            color: #000000 !important;
+        }
     </style>
     """,
     unsafe_allow_html=True,
@@ -110,7 +119,8 @@ def reset_game():
 if "started" not in st.session_state:
     reset_game()
 
-st.markdown("<div class='big-title'>🎉 Mathilde • 25 ans 🎉</div>", unsafe_allow_html=True)
+st.markdown("<div class='big-title'>Mathilde</div>", unsafe_allow_html=True)
+st.markdown("<div class='big-title'>🎉 25 ans 🎉</div>", unsafe_allow_html=True)
 
 if not st.session_state.started:
     st.image(get_image_for_step(st.session_state.revealed_cells), width="stretch")
