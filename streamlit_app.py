@@ -110,8 +110,7 @@ def reset_game():
 if "started" not in st.session_state:
     reset_game()
 
-st.markdown("<div class='big-title'>🎉 Surprise d'anniversaire 🎉</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Mathilde • 25 ans</div>", unsafe_allow_html=True)
+st.markdown("<div class='big-title'>🎉 Mathilde • 25 ans 🎉</div>", unsafe_allow_html=True)
 
 if not st.session_state.started:
     st.image(get_image_for_step(st.session_state.revealed_cells), width="stretch")
@@ -124,9 +123,7 @@ if not st.session_state.started:
 if st.session_state.completed:
     st.balloons()
     st.image(get_image_for_step(set(range(TOTAL_CELLS))), width="stretch")
-    st.success("🎊 C'est le grand moment !")
-    st.markdown("## 🎂 Bon anniversaire, Mathilde !")
-    st.markdown("### Bon anniversaire !!! Connecte toi sur url.com pour récupérer ton cadeau")
+    st.markdown("## 🎂 Bon anniversaire, Mathilde ! Connecte toi sur url.com pour récupérer ton cadeau")
     if st.button("Rejouer"):
         reset_game()
         st.rerun()

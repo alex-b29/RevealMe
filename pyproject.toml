@@ -1,7 +1,7 @@
 [project]
-name = "reveal-me"
+name = "revealme"
 version = "0.1.0"
-description = "Application d’anniversaire avec énigmes et révélation progressive d’une image."
+description = "Application avec énigmes et révélation progressive d’une image."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
