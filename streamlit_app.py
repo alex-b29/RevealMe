@@ -6,7 +6,7 @@ from app.styles import inject_styles
 
 
 def render_login_page() -> None:
-    st.markdown("<div class='subtitle'>Connecte-toi pour accéder à la surprise</div>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitle'>Connecte-toi pour accéder au jeu</div>", unsafe_allow_html=True)
 
     with st.form("login_form"):
         username = st.text_input("Nom d’utilisateur")
@@ -41,4 +41,4 @@ if not st.session_state.authenticated:
     render_login_page()
     st.stop()
 
-render_game_page()
+render_game_page(is_main_user=st.session_state.is_main_user)

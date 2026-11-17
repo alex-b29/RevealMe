@@ -75,33 +75,51 @@ def reset_game():
     st.session_state.reveal_plan = build_reveal_plan()
 
 
-def render_game_page():
+def render_game_page(is_main_user: bool = True):
     if "started" not in st.session_state:
         reset_game()
 
     st.markdown("<div class='big-title'>Mathilde</div>", unsafe_allow_html=True)
     st.markdown("<div class='big-title'>🎉 25 ans 🎉</div>", unsafe_allow_html=True)
 
+    if not is_main_user:
+        st.info("Mode administration: vous consultez la progression, sans pouvoir saisir de réponse.")
+
     if not st.session_state.started:
         st.image(get_image_for_step(st.session_state.revealed_cells), width="stretch")
         st.write("")
-        if st.button("Démarrer la surprise"):
-            st.session_state.started = True
-            st.rerun()
+
+        if is_main_user:
+            if st.button("Démarrer le jeu"):
+                st.session_state.started = True
+                st.rerun()
+        else:
+            st.caption("Le jeu n'est pas encore démarré.")
+
         st.stop()
 
     if st.session_state.completed:
         st.balloons()
         st.image(get_image_for_step(set(range(TOTAL_CELLS))), width="stretch")
-        st.markdown("## 🎂 Bon anniversaire, Mathilde ! Connecte toi sur url.com pour récupérer ton cadeau")
-        if st.button("Rejouer"):
-            reset_game()
-            st.rerun()
+
+        if is_main_user:
+            st.markdown("## 🎂 Bon anniversaire, Mathilde ! Connecte toi sur url.com pour récupérer ton cadeau")
+            if st.button("Rejouer"):
+                reset_game()
+                st.rerun()
+        else:
+            st.markdown("## 🎂 Le jeu est terminé")
+
         st.stop()
 
     current = QUESTIONS[st.session_state.current_index]
 
     st.image(get_image_for_step(st.session_state.revealed_cells), width="stretch")
+
+    if not is_main_user:
+        st.progress((st.session_state.current_index) / len(QUESTIONS))
+        st.caption(f"Progression : énigme {st.session_state.current_index + 1} sur {len(QUESTIONS)}")
+        st.stop()
 
     with st.form("quiz_form"):
         st.subheader(f"Énigme {st.session_state.current_index + 1} / {len(QUESTIONS)}")
@@ -120,7 +138,7 @@ def render_game_page():
                 st.rerun()
             else:
                 st.session_state.current_index += 1
-                st.success("Bonne réponse ! La surprise se dévoile un peu plus...")
+                st.success("Bonne réponse !")
                 st.rerun()
         else:
             st.warning("Presque ! Essaie encore.")
