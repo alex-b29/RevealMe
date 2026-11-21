@@ -157,6 +157,9 @@ def render_game_page(is_main_user: bool = True) -> None:
 
     if not is_main_user:
         st.info("Mode administration : vous consultez la progression, sans pouvoir saisir de réponse.")
+        if st.button("Actualiser"):
+            apply_progression(load_game_config()["progression"])
+            st.rerun()
 
     if not st.session_state.started:
         st.image(get_mosaic_image({}), width="stretch")
