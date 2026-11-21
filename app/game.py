@@ -1,12 +1,13 @@
+import hashlib
 import json
 import random
 from io import BytesIO
 from pathlib import Path
 
 import streamlit as st
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
-from app.storage import get_supabase_image
+from app.storage import fetch_image_from_storage
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 GAME_CONFIG_PATH = DATA_DIR / "game_config.json"
@@ -27,20 +28,19 @@ def normalize(value: str) -> str:
 
 
 def get_participant_color(name: str) -> tuple[int, int, int]:
-    return (
-        random.randint(110, 235),
-        random.randint(110, 235),
-        random.randint(110, 235),
-    )
+    digest = hashlib.sha256(normalize(name).encode("utf-8")).digest()
+    red = 110 + digest[0] % 126
+    green = 110 + digest[1] % 126
+    blue = 110 + digest[2] % 126
+    return red, green, blue
 
 
 GAME_CONFIG = load_game_config()
-CHAIN = GAME_CONFIG["chain"]
-QUESTIONS = CHAIN
+ORDERED_PARTICIPANTS = GAME_CONFIG["ordered_participants"]
 
 
 def build_mosaic_positions() -> list[int]:
-    return random.sample(range(TOTAL_CELLS), len(QUESTIONS))
+    return random.sample(range(TOTAL_CELLS), len(ORDERED_PARTICIPANTS))
 
 
 def get_mosaic_dimensions(item_count: int) -> tuple[int, int]:
@@ -66,7 +66,7 @@ def get_mosaic_dimensions(item_count: int) -> tuple[int, int]:
     return cols, rows
 
 
-GRID_COLS, GRID_ROWS = get_mosaic_dimensions(len(QUESTIONS))
+GRID_COLS, GRID_ROWS = get_mosaic_dimensions(len(ORDERED_PARTICIPANTS))
 TOTAL_CELLS = GRID_COLS * GRID_ROWS
 
 
@@ -97,11 +97,19 @@ def get_mosaic_image(revealed_portraits: dict[int, dict]) -> Image.Image:
                 continue
 
             entry = revealed_portraits[cell_id]
-            color = entry["color"]
-            draw.rectangle(
-                (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
-                fill=color,
-            )
+            portrait = entry.get("portrait")
+            if portrait is not None:
+                portrait = ImageOps.fit(
+                    portrait,
+                    (tile_w - 6, tile_h - 6),
+                    method=Image.Resampling.LANCZOS,
+                )
+                canvas.paste(portrait, (x0 + 3, y0 + 3))
+            else:
+                draw.rectangle(
+                    (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
+                    fill=get_participant_color(entry["giver"]),
+                )
 
     return canvas
 
@@ -119,7 +127,7 @@ def reset_game() -> None:
 
 def apply_progression(progression: dict) -> None:
     mosaic_positions = progression.get("mosaic_positions", [])
-    if len(mosaic_positions) != len(QUESTIONS):
+    if len(mosaic_positions) != len(ORDERED_PARTICIPANTS):
         mosaic_positions = build_mosaic_positions()
         progression["mosaic_positions"] = mosaic_positions
         game_config = load_game_config()
@@ -128,20 +136,24 @@ def apply_progression(progression: dict) -> None:
 
     st.session_state.started = progression["started"]
     st.session_state.current_index = progression["current_index"]
-    st.session_state.completed = st.session_state.current_index >= len(QUESTIONS)
+    st.session_state.completed = st.session_state.current_index >= len(ORDERED_PARTICIPANTS)
     st.session_state.mosaic_positions = mosaic_positions
 
     revealed_portraits: dict[int, dict] = {}
 
-    if len(mosaic_positions) == len(QUESTIONS):
+    if len(mosaic_positions) == len(ORDERED_PARTICIPANTS):
         for index in range(st.session_state.current_index):
-            if index >= len(QUESTIONS):
+            if index >= len(ORDERED_PARTICIPANTS):
                 break
             cell_id = mosaic_positions[index]
-            participant_name = CHAIN[index]
+            participant_name = ORDERED_PARTICIPANTS[index]
+            image_bytes = fetch_image_from_storage(participant_name)
+            portrait = None
+            if image_bytes:
+                portrait = Image.open(BytesIO(image_bytes)).convert("RGB")
             revealed_portraits[cell_id] = {
                 "giver": participant_name,
-                "color": get_participant_color(participant_name),
+                "portrait": portrait,
             }
 
     st.session_state.revealed_portraits = revealed_portraits
@@ -160,7 +172,7 @@ def render_game_page(is_main_user: bool = True) -> None:
 
     image_column, text_column = st.columns([1, 2], vertical_alignment="center")
     with image_column:
-        image_bytes = get_supabase_image(GAME_CONFIG["name"])
+        image_bytes = fetch_image_from_storage(GAME_CONFIG["name"])
         if image_bytes:
             st.image(BytesIO(image_bytes), width="stretch")
         else:
@@ -208,17 +220,17 @@ def render_game_page(is_main_user: bool = True) -> None:
         st.stop()
 
     if not is_main_user:
-        progress = st.session_state.current_index / len(QUESTIONS)
+        progress = st.session_state.current_index / len(ORDERED_PARTICIPANTS)
         st.progress(progress)
         st.caption(
-            f"Progression : {st.session_state.current_index} / {len(QUESTIONS)} personnes validées"
+            f"Progression : {st.session_state.current_index} / {len(ORDERED_PARTICIPANTS)} personnes validées"
         )
         st.stop()
 
-    current_name = QUESTIONS[st.session_state.current_index]
+    current_name = ORDERED_PARTICIPANTS[st.session_state.current_index]
 
     with st.form("quiz_form"):
-        st.subheader(f"Personne {st.session_state.current_index + 1} / {len(QUESTIONS)}")
+        st.subheader(f"Personne {st.session_state.current_index + 1} / {len(ORDERED_PARTICIPANTS)}")
         answer = st.text_input(
             "Prénom de la personne",
             key=f"answer_{st.session_state.current_index}",

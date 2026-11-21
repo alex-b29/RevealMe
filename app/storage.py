@@ -5,12 +5,12 @@ import streamlit as st
 
 
 @st.cache_data(ttl=3600)
-def get_supabase_image(name: str) -> bytes | None:
+def fetch_image_from_storage(name: str) -> bytes | None:
     """Return an image from private Supabase S3 storage, or None if misconfigured."""
-    endpoint = st.secrets.get("SUPABASE_S3_ENDPOINT", "")
-    bucket = st.secrets.get("SUPABASE_BUCKET", "")
-    access_key = st.secrets.get("SUPABASE_S3_ACCESS_KEY", "")
-    secret_key = st.secrets.get("SUPABASE_S3_SECRET_KEY", "")
+    endpoint = st.secrets.get("S3_ENDPOINT", "")
+    bucket = st.secrets.get("BUCKET_NAME", "")
+    access_key = st.secrets.get("S3_ACCESS_KEY", "")
+    secret_key = st.secrets.get("S3_SECRET_KEY", "")
 
     if not all((endpoint, bucket, access_key, secret_key)):
         return None
@@ -21,8 +21,11 @@ def get_supabase_image(name: str) -> bytes | None:
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
     )
-    response = client.get_object(
-        Bucket=bucket,
-        Key=f"{name}.jpg",
-    )
-    return response["Body"].read()
+    try:
+        response = client.get_object(
+            Bucket=bucket,
+            Key=f"{name}.jpg",
+        )
+        return response["Body"].read()
+    except Exception:
+        return None
