@@ -1,9 +1,12 @@
 import json
 import random
+from io import BytesIO
 from pathlib import Path
 
 import streamlit as st
 from PIL import Image, ImageDraw
+
+from app.storage import get_supabase_image
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 GAME_CONFIG_PATH = DATA_DIR / "game_config.json"
@@ -155,8 +158,16 @@ def render_game_page(is_main_user: bool = True) -> None:
     if "started" not in st.session_state:
         apply_progression(load_game_config()["progression"])
 
-    st.markdown(f"<div class='big-title'>{GAME_CONFIG['name']}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='big-title'>🎉 {GAME_CONFIG['age']} ans 🎉</div>", unsafe_allow_html=True)
+    image_column, text_column = st.columns([1, 2], vertical_alignment="center")
+    with image_column:
+        image_bytes = get_supabase_image(GAME_CONFIG["name"])
+        if image_bytes:
+            st.image(BytesIO(image_bytes), width="stretch")
+        else:
+            st.warning("Configure les secrets Supabase S3 pour afficher l’image.")
+    with text_column:
+        st.markdown(f"<div class='big-title'>{GAME_CONFIG['name']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='big-title'>🎉 {GAME_CONFIG['age']} ans 🎉</div>", unsafe_allow_html=True)
 
     if not is_main_user:
         st.info("Mode administration : vous consultez la progression, sans pouvoir saisir de réponse.")
