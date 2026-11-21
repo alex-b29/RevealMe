@@ -1,26 +1,15 @@
 import hashlib
-import json
 import random
 from io import BytesIO
-from pathlib import Path
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageOps
 
-from app.storage import fetch_image_from_storage
-
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-GAME_CONFIG_PATH = DATA_DIR / "game_config.json"
-
-
-def load_game_config() -> dict:
-    with GAME_CONFIG_PATH.open("r", encoding="utf-8") as file:
-        return json.load(file)
-
-
-def save_game_config(game_config: dict) -> None:
-    with GAME_CONFIG_PATH.open("w", encoding="utf-8") as file:
-        json.dump(game_config, file, ensure_ascii=False, indent=2)
+from app.storage import (
+    fetch_game_config,
+    fetch_image_from_storage,
+    save_game_config_to_storage,
+)
 
 
 def normalize(value: str) -> str:
@@ -33,6 +22,18 @@ def get_participant_color(name: str) -> tuple[int, int, int]:
     green = 110 + digest[1] % 126
     blue = 110 + digest[2] % 126
     return red, green, blue
+
+
+def load_game_config() -> dict:
+    remote_config = fetch_game_config()
+    if remote_config is None:
+        raise RuntimeError("game_config.json est introuvable dans le bucket S3")
+    return remote_config
+
+
+def save_game_config(game_config: dict) -> None:
+    if not save_game_config_to_storage(game_config):
+        raise RuntimeError("Impossible de sauvegarder game_config.json dans le bucket S3")
 
 
 GAME_CONFIG = load_game_config()
