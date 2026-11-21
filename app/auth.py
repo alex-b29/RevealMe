@@ -8,7 +8,7 @@ def normalize(value: str) -> str:
 
 
 def get_streamlit_users() -> list[list | tuple]:
-    users = st.secrets.get("app", {}).get("USERS", [])
+    users = st.secrets.get("USERS", [])
 
     if isinstance(users, str):
         try:
