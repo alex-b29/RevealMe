@@ -1,3 +1,5 @@
+import ast
+
 import streamlit as st
 
 
@@ -6,7 +8,18 @@ def normalize(value: str) -> str:
 
 
 def get_streamlit_users() -> list[list | tuple]:
-    return list(st.secrets.get("app", {}).get("USERS", []))
+    users = st.secrets.get("app", {}).get("USERS", [])
+
+    if isinstance(users, str):
+        try:
+            users = ast.literal_eval(users)
+        except (SyntaxError, ValueError):
+            return []
+
+    if not isinstance(users, (list, tuple)):
+        return []
+
+    return list(users)
 
 
 def authenticate_user(username: str, password: str) -> tuple[bool, bool]:
