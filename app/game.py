@@ -1,49 +1,39 @@
-"""Game logic and rendering for the reveal challenge."""
-
-import io
+import json
 import random
-import urllib.request
+from pathlib import Path
 
 import streamlit as st
 from PIL import Image, ImageDraw
 
-QUESTIONS = [
-    {"question": "2 + 2 = ?", "answer": "4", "giver": "Alex"},
-    {"question": "5 + 3 = ?", "answer": "8", "giver": "Camille"},
-    {"question": "7 + 1 = ?", "answer": "8", "giver": "Sarah"},
-    {"question": "9 + 6 = ?", "answer": "15", "giver": "Lucas"},
-    {"question": "11 + 8 = ?", "answer": "19", "giver": "Chloé"},
-]
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+GAME_CONFIG_PATH = DATA_DIR / "game_config.json"
 
-PORTRAIT_URLS = [
-    "https://picsum.photos/seed/alex/300/300",
-    "https://picsum.photos/seed/camille/300/300",
-    "https://picsum.photos/seed/sarah/300/300",
-    "https://picsum.photos/seed/lucas/300/300",
-    "https://picsum.photos/seed/chloe/300/300",
-]
+
+def load_game_config() -> dict:
+    with GAME_CONFIG_PATH.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def save_game_config(game_config: dict) -> None:
+    with GAME_CONFIG_PATH.open("w", encoding="utf-8") as file:
+        json.dump(game_config, file, ensure_ascii=False, indent=2)
 
 
 def normalize(value: str) -> str:
     return " ".join(value.strip().lower().split())
 
 
-@st.cache_data(show_spinner=False)
-def download_portrait(url: str) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(request, timeout=10) as response:
-        return response.read()
+def get_participant_color(name: str) -> tuple[int, int, int]:
+    rng = random.Random(normalize(name))
+    return (rng.randint(110, 235), rng.randint(110, 235), rng.randint(110, 235))
 
 
-def load_portrait(url: str) -> Image.Image:
-    try:
-        image_bytes = download_portrait(url)
-        return Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    except Exception:
-        return Image.new("RGB", (300, 300), (255, 215, 232))
+GAME_CONFIG = load_game_config()
+CHAIN = GAME_CONFIG["chain"]
+QUESTIONS = CHAIN
 
 
-def build_reveal_plan() -> list[int]:
+def build_mosaic_positions() -> list[int]:
     return random.sample(range(TOTAL_CELLS), len(QUESTIONS))
 
 
@@ -101,28 +91,69 @@ def get_mosaic_image(revealed_portraits: dict[int, dict]) -> Image.Image:
                 continue
 
             entry = revealed_portraits[cell_id]
-            portrait = load_portrait(entry["portrait"])
-            portrait = portrait.resize((tile_w - 6, tile_h - 6), Image.Resampling.LANCZOS)
-            canvas.paste(portrait, (x0 + 3, y0 + 3))
+            color = entry["color"]
+            draw.rectangle(
+                (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
+                fill=color,
+            )
 
     return canvas
 
 
 def reset_game() -> None:
-    st.session_state.started = False
-    st.session_state.current_index = 0
-    st.session_state.completed = False
-    st.session_state.answer = ""
-    st.session_state.revealed_portraits = {}
-    st.session_state.reveal_plan = build_reveal_plan()
+    game_config = load_game_config()
+    game_config["progression"] = {
+        "started": False,
+        "current_index": 0,
+        "mosaic_positions": build_mosaic_positions(),
+    }
+    save_game_config(game_config)
+    apply_progression(game_config["progression"])
+
+
+def apply_progression(progression: dict) -> None:
+    mosaic_positions = progression.get("mosaic_positions", [])
+    if len(mosaic_positions) != len(QUESTIONS):
+        mosaic_positions = build_mosaic_positions()
+        progression["mosaic_positions"] = mosaic_positions
+        game_config = load_game_config()
+        game_config["progression"] = progression
+        save_game_config(game_config)
+
+    st.session_state.started = progression["started"]
+    st.session_state.current_index = progression["current_index"]
+    st.session_state.completed = st.session_state.current_index >= len(QUESTIONS)
+    st.session_state.mosaic_positions = mosaic_positions
+
+    revealed_portraits: dict[int, dict] = {}
+
+    if len(mosaic_positions) == len(QUESTIONS):
+        for index in range(st.session_state.current_index):
+            if index >= len(QUESTIONS):
+                break
+            cell_id = mosaic_positions[index]
+            participant_name = CHAIN[index]
+            revealed_portraits[cell_id] = {
+                "giver": participant_name,
+                "color": get_participant_color(participant_name),
+            }
+
+    st.session_state.revealed_portraits = revealed_portraits
+
+
+def save_and_apply_progression(progression: dict) -> None:
+    game_config = load_game_config()
+    game_config["progression"] = progression
+    save_game_config(game_config)
+    apply_progression(progression)
 
 
 def render_game_page(is_main_user: bool = True) -> None:
     if "started" not in st.session_state:
-        reset_game()
+        apply_progression(load_game_config()["progression"])
 
-    st.markdown("<div class='big-title'>Mathilde</div>", unsafe_allow_html=True)
-    st.markdown("<div class='big-title'>🎉 25 ans 🎉</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='big-title'>{GAME_CONFIG['name']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='big-title'>🎉 {GAME_CONFIG['age']} ans 🎉</div>", unsafe_allow_html=True)
 
     if not is_main_user:
         st.info("Mode administration : vous consultez la progression, sans pouvoir saisir de réponse.")
@@ -132,7 +163,9 @@ def render_game_page(is_main_user: bool = True) -> None:
 
         if is_main_user:
             if st.button("Démarrer le jeu"):
-                st.session_state.started = True
+                game_config = load_game_config()
+                game_config["progression"]["started"] = True
+                save_and_apply_progression(game_config["progression"])
                 st.rerun()
         else:
             st.caption("Le jeu n'est pas encore démarré.")
@@ -148,7 +181,7 @@ def render_game_page(is_main_user: bool = True) -> None:
         st.balloons()
 
         if is_main_user:
-            st.markdown("## 🎂 Bon anniversaire, Mathilde !")
+            st.markdown(f"## 🎂 Bon anniversaire, {GAME_CONFIG['name']} !")
             if st.button("Rejouer"):
                 reset_game()
                 st.rerun()
@@ -161,32 +194,28 @@ def render_game_page(is_main_user: bool = True) -> None:
         progress = st.session_state.current_index / len(QUESTIONS)
         st.progress(progress)
         st.caption(
-            f"Progression : {st.session_state.current_index} / {len(QUESTIONS)} énigmes validées"
+            f"Progression : {st.session_state.current_index} / {len(QUESTIONS)} personnes validées"
         )
         st.stop()
 
-    current = QUESTIONS[st.session_state.current_index]
+    current_name = QUESTIONS[st.session_state.current_index]
 
     with st.form("quiz_form"):
-        st.subheader(f"Énigme {st.session_state.current_index + 1} / {len(QUESTIONS)}")
-        st.write(current["question"])
-        answer = st.text_input("Ta réponse", key="answer")
+        st.subheader(f"Personne {st.session_state.current_index + 1} / {len(QUESTIONS)}")
+        answer = st.text_input(
+            "Prénom de la personne",
+            key=f"answer_{st.session_state.current_index}",
+        )
         submitted = st.form_submit_button("Valider")
 
     if submitted:
-        if normalize(answer) == normalize(current["answer"]):
-            mosaic_cell = st.session_state.reveal_plan[st.session_state.current_index]
-            st.session_state.revealed_portraits[mosaic_cell] = {
-                "giver": current["giver"],
-                "portrait": PORTRAIT_URLS[st.session_state.current_index],
-            }
+        if normalize(answer) == normalize(current_name):
+            game_config = load_game_config()
+            progression = game_config["progression"]
+            progression["current_index"] = st.session_state.current_index + 1
 
-            st.session_state.current_index += 1
-
-            if st.session_state.current_index >= len(QUESTIONS):
-                st.session_state.completed = True
-
-            st.success("Bonne réponse ! Une case vient de se révéler.")
+            save_and_apply_progression(progression)
+            st.success("Bonne personne ! Contacte-la pour recevoir la prochaine énigme.")
             st.rerun()
         else:
-            st.warning("Presque ! Essaie encore.")
+            st.warning("Ce n'est pas cette personne. Essaie encore !")

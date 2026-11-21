@@ -1,0 +1,22 @@
+{
+  "name": "Mathilde",
+  "age": 25,
+  "chain": [
+    "Alex",
+    "Camille",
+    "Sarah",
+    "Lucas",
+    "Chloé"
+  ],
+  "progression": {
+    "started": false,
+    "current_index": 0,
+    "mosaic_positions": [
+      4,
+      5,
+      3,
+      2,
+      0
+    ]
+  }
+}
