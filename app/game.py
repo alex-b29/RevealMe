@@ -24,8 +24,11 @@ def normalize(value: str) -> str:
 
 
 def get_participant_color(name: str) -> tuple[int, int, int]:
-    rng = random.Random(normalize(name))
-    return (rng.randint(110, 235), rng.randint(110, 235), rng.randint(110, 235))
+    return (
+        random.randint(110, 235),
+        random.randint(110, 235),
+        random.randint(110, 235),
+    )
 
 
 GAME_CONFIG = load_game_config()
