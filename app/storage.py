@@ -15,7 +15,7 @@ def get_s3_client():
     )
 
 
-def fetch_game_config() -> dict | None:
+def load_game_config() -> dict | None:
     """Fetch game_config.json from the configured Supabase bucket."""
     try:
         client = get_s3_client()
@@ -24,11 +24,11 @@ def fetch_game_config() -> dict | None:
             Key="game_config.json",
         )
         return json.loads(response["Body"].read().decode("utf-8"))
-    except Exception:
-        return None
+    except Exception as e:
+        raise RuntimeError("game_config.json est introuvable dans le bucket S3") from e
 
 
-def save_game_config_to_storage(game_config: dict) -> bool:
+def save_game_config(game_config: dict) -> bool:
     """Upload game_config.json to the configured Supabase bucket."""
     try:
         client = get_s3_client()
@@ -40,8 +40,8 @@ def save_game_config_to_storage(game_config: dict) -> bool:
             ContentType="application/json",
         )
         return True
-    except Exception:
-        return False
+    except Exception as e:
+        raise RuntimeError("Impossible de sauvegarder game_config.json dans le bucket S3") from e
 
 
 @st.cache_data(ttl=3600)

@@ -1,118 +1,23 @@
-import hashlib
-import random
 from io import BytesIO
 
 import streamlit as st
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image
 
-from app.storage import (
-    fetch_game_config,
-    fetch_image_from_storage,
-    save_game_config_to_storage,
+from app.mosaic import (
+    build_mosaic_positions,
+    get_mosaic_dimensions,
+    get_mosaic_image,
+    normalize,
 )
-
-
-def normalize(value: str) -> str:
-    return " ".join(value.strip().lower().split())
-
-
-def get_participant_color(name: str) -> tuple[int, int, int]:
-    digest = hashlib.sha256(normalize(name).encode("utf-8")).digest()
-    red = 110 + digest[0] % 126
-    green = 110 + digest[1] % 126
-    blue = 110 + digest[2] % 126
-    return red, green, blue
-
-
-def load_game_config() -> dict:
-    remote_config = fetch_game_config()
-    if remote_config is None:
-        raise RuntimeError("game_config.json est introuvable dans le bucket S3")
-    return remote_config
-
-
-def save_game_config(game_config: dict) -> None:
-    if not save_game_config_to_storage(game_config):
-        raise RuntimeError("Impossible de sauvegarder game_config.json dans le bucket S3")
-
+from app.storage import (
+    fetch_image_from_storage,
+    save_game_config,
+    load_game_config,
+)
 
 GAME_CONFIG = load_game_config()
 ORDERED_PARTICIPANTS = GAME_CONFIG["ordered_participants"]
-
-
-def build_mosaic_positions() -> list[int]:
-    return random.sample(range(TOTAL_CELLS), len(ORDERED_PARTICIPANTS))
-
-
-def get_mosaic_dimensions(item_count: int) -> tuple[int, int]:
-    if item_count <= 0:
-        return 1, 1
-
-    candidates: list[tuple[int, int, int, int]] = []
-
-    for cols in range(1, item_count + 1):
-        for rows in range(1, cols + 1):
-            if item_count > 3 and rows == 1:
-                continue
-
-            cell_count = cols * rows
-            if cell_count < item_count:
-                continue
-
-            extra = cell_count - item_count
-            difference = cols - rows
-            candidates.append((extra, difference, cols, rows))
-
-    _, _, cols, rows = min(candidates)
-    return cols, rows
-
-
 GRID_COLS, GRID_ROWS = get_mosaic_dimensions(len(ORDERED_PARTICIPANTS))
-TOTAL_CELLS = GRID_COLS * GRID_ROWS
-
-
-def get_mosaic_image(revealed_portraits: dict[int, dict]) -> Image.Image:
-    canvas = Image.new("RGB", (900, 675), (255, 244, 179))
-    tile_w = canvas.width // GRID_COLS
-    tile_h = canvas.height // GRID_ROWS
-    draw = ImageDraw.Draw(canvas)
-
-    for row in range(GRID_ROWS):
-        for col in range(GRID_COLS):
-            cell_id = row * GRID_COLS + col
-            x0 = col * tile_w
-            y0 = row * tile_h
-            x1 = x0 + tile_w
-            y1 = y0 + tile_h
-
-            if cell_id not in revealed_portraits:
-                draw.rectangle(
-                    (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
-                    fill=(18, 22, 34),
-                )
-                draw.rectangle(
-                    (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
-                    outline=(112, 128, 170),
-                    width=3,
-                )
-                continue
-
-            entry = revealed_portraits[cell_id]
-            portrait = entry.get("portrait")
-            if portrait is not None:
-                portrait = ImageOps.fit(
-                    portrait,
-                    (tile_w - 6, tile_h - 6),
-                    method=Image.Resampling.LANCZOS,
-                )
-                canvas.paste(portrait, (x0 + 3, y0 + 3))
-            else:
-                draw.rectangle(
-                    (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
-                    fill=get_participant_color(entry["giver"]),
-                )
-
-    return canvas
 
 
 def reset_game() -> None:
@@ -120,7 +25,7 @@ def reset_game() -> None:
     game_config["progression"] = {
         "started": False,
         "current_index": 0,
-        "mosaic_positions": build_mosaic_positions(),
+        "mosaic_positions": build_mosaic_positions(len(ORDERED_PARTICIPANTS)),
     }
     save_game_config(game_config)
     apply_progression(game_config["progression"])
@@ -128,8 +33,10 @@ def reset_game() -> None:
 
 def apply_progression(progression: dict) -> None:
     mosaic_positions = progression.get("mosaic_positions", [])
-    if len(mosaic_positions) != len(ORDERED_PARTICIPANTS):
-        mosaic_positions = build_mosaic_positions()
+    positions_need_repair = len(mosaic_positions) != len(ORDERED_PARTICIPANTS)
+
+    if positions_need_repair:
+        mosaic_positions = build_mosaic_positions(len(ORDERED_PARTICIPANTS))
         progression["mosaic_positions"] = mosaic_positions
         game_config = load_game_config()
         game_config["progression"] = progression
@@ -153,7 +60,7 @@ def apply_progression(progression: dict) -> None:
             if image_bytes:
                 portrait = Image.open(BytesIO(image_bytes)).convert("RGB")
             revealed_portraits[cell_id] = {
-                "giver": participant_name,
+                "name": participant_name,
                 "portrait": portrait,
             }
 
@@ -176,8 +83,6 @@ def render_game_page(is_main_user: bool = True) -> None:
         image_bytes = fetch_image_from_storage(GAME_CONFIG["name"])
         if image_bytes:
             st.image(BytesIO(image_bytes), width="stretch")
-        else:
-            st.warning("Configure les secrets Supabase S3 pour afficher l’image.")
     with text_column:
         st.markdown(f"<div class='big-title'>{GAME_CONFIG['name']}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='big-title'>🎉 {GAME_CONFIG['age']} ans 🎉</div>", unsafe_allow_html=True)
@@ -189,7 +94,7 @@ def render_game_page(is_main_user: bool = True) -> None:
             st.rerun()
 
     if not st.session_state.started:
-        st.image(get_mosaic_image({}), width="stretch")
+        st.image(get_mosaic_image({}, GRID_COLS, GRID_ROWS), width="stretch")
 
         if is_main_user:
             if st.button("Démarrer le jeu"):
@@ -203,7 +108,7 @@ def render_game_page(is_main_user: bool = True) -> None:
         st.stop()
 
     st.image(
-        get_mosaic_image(st.session_state.revealed_portraits),
+        get_mosaic_image(st.session_state.revealed_portraits, GRID_COLS, GRID_ROWS),
         width="stretch",
     )
 
