@@ -1,7 +1,7 @@
 from io import BytesIO
 
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageOps
 
 from app.mosaic import (
     build_mosaic_positions,
@@ -58,7 +58,7 @@ def apply_progression(progression: dict) -> None:
             image_bytes = fetch_image_from_storage(participant_name)
             portrait = None
             if image_bytes:
-                portrait = Image.open(BytesIO(image_bytes)).convert("RGB")
+                portrait = ImageOps.exif_transpose(Image.open(BytesIO(image_bytes))).convert("RGB")
             revealed_portraits[cell_id] = {
                 "name": participant_name,
                 "portrait": portrait,

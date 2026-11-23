@@ -50,9 +50,13 @@ def get_mosaic_image(
     grid_cols: int,
     grid_rows: int,
 ) -> Image.Image:
-    canvas = Image.new("RGB", (900, 675), (255, 244, 179))
-    tile_w = canvas.width // grid_cols
-    tile_h = canvas.height // grid_rows
+    tile_w = 225
+    tile_h = 300
+    canvas = Image.new(
+        "RGB",
+        (tile_w * grid_cols, tile_h * grid_rows),
+        (255, 244, 179),
+    )
     draw = ImageDraw.Draw(canvas)
 
     for row in range(grid_rows):
@@ -65,28 +69,24 @@ def get_mosaic_image(
 
             if cell_id not in revealed_portraits:
                 draw.rectangle(
-                    (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
+                    (x0, y0, x1 - 1, y1 - 1),
                     fill=(18, 22, 34),
-                )
-                draw.rectangle(
-                    (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
-                    outline=(112, 128, 170),
-                    width=3,
                 )
                 continue
 
             entry = revealed_portraits[cell_id]
             portrait = entry.get("portrait")
             if portrait is not None:
+                portrait = ImageOps.exif_transpose(portrait)
                 portrait = ImageOps.fit(
                     portrait,
-                    (tile_w - 6, tile_h - 6),
+                    (tile_w, tile_h),
                     method=Image.Resampling.LANCZOS,
                 )
-                canvas.paste(portrait, (x0 + 3, y0 + 3))
+                canvas.paste(portrait, (x0, y0))
             else:
                 draw.rectangle(
-                    (x0 + 3, y0 + 3, x1 - 3, y1 - 3),
+                    (x0, y0, x1 - 1, y1 - 1),
                     fill=get_participant_color(entry["name"]),
                 )
 
