@@ -8,7 +8,7 @@ from app.mosaic import (
     get_mosaic_dimensions,
     get_mosaic_image,
 )
-from app.utils import normalize
+from app.utils import capitalize_name, normalize
 from app.storage import (
     fetch_image_from_storage,
     save_game_config,
@@ -110,7 +110,8 @@ def render_game_page(is_main_user: bool = True) -> None:
         if image_bytes:
             st.image(BytesIO(image_bytes), width="stretch")
     with text_column:
-        st.markdown(f"<div class='big-title'>{GAME_CONFIG['name']}</div>", unsafe_allow_html=True)
+        player_name = capitalize_name(GAME_CONFIG["name"])
+        st.markdown(f"<div class='big-title'>{player_name}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='big-title'>🎉 {GAME_CONFIG['age']} ans 🎉</div>", unsafe_allow_html=True)
 
     if not is_main_user:
@@ -146,7 +147,7 @@ def render_game_page(is_main_user: bool = True) -> None:
         st.balloons()
 
         if is_main_user:
-            st.markdown(f"## 🎂 Bon anniversaire, {GAME_CONFIG['name']} !")
+            st.markdown(f"## 🎂 Bon anniversaire, {capitalize_name(GAME_CONFIG['name'])} !")
             if st.button("Rejouer"):
                 reset_game()
                 st.rerun()
@@ -178,7 +179,7 @@ def render_game_page(is_main_user: bool = True) -> None:
             phone_number = get_phone_number(current_name)
             if phone_number:
                 contact_message = (
-                    f"Bonne personne ! Contacte {current_name} au **{phone_number}** "
+                    f"Bonne personne ! Contacte {capitalize_name(current_name)} au **{phone_number}** "
                     "pour recevoir la prochaine énigme."
                 )
             else:

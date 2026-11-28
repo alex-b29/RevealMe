@@ -9,3 +9,10 @@ def normalize(value: str) -> str:
         if not unicodedata.combining(character)
     )
     return " ".join(without_accents.strip().lower().split())
+
+
+def capitalize_name(value: str) -> str:
+    value = str(value)
+    if not value:
+        return value
+    return value[0].upper() + value[1:]
