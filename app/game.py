@@ -7,8 +7,8 @@ from app.mosaic import (
     build_mosaic_positions,
     get_mosaic_dimensions,
     get_mosaic_image,
-    normalize,
 )
+from app.utils import normalize
 from app.storage import (
     fetch_image_from_storage,
     save_game_config,
@@ -18,6 +18,32 @@ from app.storage import (
 GAME_CONFIG = load_game_config()
 ORDERED_PARTICIPANTS = GAME_CONFIG["ordered_participants"]
 GRID_COLS, GRID_ROWS = get_mosaic_dimensions(len(ORDERED_PARTICIPANTS))
+
+
+def get_phone_number(participant_name: str) -> str | None:
+    phone_numbers = GAME_CONFIG.get("phone_number_by_participant", {})
+    if not isinstance(phone_numbers, dict):
+        return None
+
+    phone_number = phone_numbers.get(participant_name)
+    if phone_number is None:
+        return None
+
+    phone = str(phone_number).strip()
+    return phone or None
+
+
+def answer_matches_participant(answer: str, participant_name: str) -> bool:
+    aliases_by_participant = GAME_CONFIG.get("alias_by_participant", {})
+    valid_answers = [participant_name]
+
+    if isinstance(aliases_by_participant, dict):
+        aliases = aliases_by_participant.get(participant_name)
+        if isinstance(aliases, list):
+            valid_answers.extend(str(alias) for alias in aliases)
+
+    normalized_answer = normalize(answer)
+    return normalized_answer in valid_answers
 
 
 def reset_game() -> None:
@@ -112,6 +138,10 @@ def render_game_page(is_main_user: bool = True) -> None:
         width="stretch",
     )
 
+    contact_message = st.session_state.pop("contact_message", None)
+    if contact_message:
+        st.success(contact_message)
+
     if st.session_state.completed:
         st.balloons()
 
@@ -144,13 +174,23 @@ def render_game_page(is_main_user: bool = True) -> None:
         submitted = st.form_submit_button("Valider")
 
     if submitted:
-        if normalize(answer) == normalize(current_name):
+        if answer_matches_participant(answer, current_name):
+            phone_number = get_phone_number(current_name)
+            if phone_number:
+                contact_message = (
+                    f"Bonne personne ! Contacte {current_name} au **{phone_number}** "
+                    "pour recevoir la prochaine énigme."
+                )
+            else:
+                contact_message = "Bonne personne ! Contacte-la pour recevoir la prochaine énigme."
+
             game_config = load_game_config()
             progression = game_config["progression"]
             progression["current_index"] = st.session_state.current_index + 1
 
             save_and_apply_progression(progression)
-            st.success("Bonne personne ! Contacte-la pour recevoir la prochaine énigme.")
+            st.session_state.contact_message = contact_message
             st.rerun()
         else:
+            st.session_state.pop("contact_message", None)
             st.warning("Ce n'est pas cette personne. Essaie encore !")
