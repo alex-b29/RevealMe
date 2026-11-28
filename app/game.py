@@ -183,18 +183,22 @@ def render_game_page(is_main_user: bool = True) -> None:
 
     if submitted:
         if answer_matches_participant(answer, current_name):
-            phone_number = get_phone_number(current_name)
-            if phone_number:
-                contact_message = (
-                    f"Bonne personne ! Contacte {capitalize_name(current_name)} au **{phone_number}** "
-                    "pour recevoir la prochaine énigme."
-                )
+            next_index = st.session_state.current_index + 1
+            if next_index >= len(ORDERED_PARTICIPANTS):
+                contact_message = "Bonne personne !"
             else:
-                contact_message = "Bonne personne ! Contacte-la pour recevoir la prochaine énigme."
+                phone_number = get_phone_number(current_name)
+                if phone_number:
+                    contact_message = (
+                        f"Bonne personne ! Tu peux la contacter au **{phone_number}** "
+                        "pour recevoir la prochaine énigme."
+                    )
+                else:
+                    contact_message = "Bonne personne ! Contacte-la pour recevoir la prochaine énigme."
 
             game_config = load_game_config()
             progression = game_config["progression"]
-            progression["current_index"] = st.session_state.current_index + 1
+            progression["current_index"] = next_index
 
             save_and_apply_progression(progression)
             st.session_state.contact_message = contact_message
