@@ -20,29 +20,6 @@ ORDERED_PARTICIPANTS = GAME_CONFIG["ordered_participants"]
 GRID_COLS, GRID_ROWS = get_mosaic_dimensions(len(ORDERED_PARTICIPANTS))
 
 
-@st.cache_resource(ttl=3600)
-def get_cached_portrait(participant_name: str) -> Image.Image | None:
-    """Download and decode an image once, then keep it in memory."""
-    image_bytes = fetch_image_from_storage(participant_name)
-    if not image_bytes:
-        return None
-
-    return ImageOps.exif_transpose(Image.open(BytesIO(image_bytes))).convert("RGB")
-
-
-def preload_game_images() -> None:
-    """Preload all game images once per user session."""
-    if st.session_state.get("images_preloaded", False):
-        return
-
-    image_names = tuple(dict.fromkeys((GAME_CONFIG["name"], *ORDERED_PARTICIPANTS)))
-    with st.spinner("Préparation des images…"):
-        for participant_name in image_names:
-            get_cached_portrait(participant_name)
-
-    st.session_state.images_preloaded = True
-
-
 def get_phone_number(participant_name: str) -> str | None:
     phone_numbers = GAME_CONFIG.get("phone_number_by_participant", {})
     if not isinstance(phone_numbers, dict):
@@ -111,7 +88,10 @@ def apply_progression(progression: dict) -> None:
                 break
             cell_id = mosaic_positions[index]
             participant_name = ORDERED_PARTICIPANTS[index]
-            portrait = get_cached_portrait(participant_name)
+            image_bytes = fetch_image_from_storage(participant_name)
+            portrait = None
+            if image_bytes:
+                portrait = ImageOps.exif_transpose(Image.open(BytesIO(image_bytes))).convert("RGB")
             revealed_portraits[cell_id] = {
                 "name": participant_name,
                 "portrait": portrait,
@@ -128,16 +108,14 @@ def save_and_apply_progression(progression: dict) -> None:
 
 
 def render_game_page(is_main_user: bool = True) -> None:
-    preload_game_images()
-
     if "started" not in st.session_state:
         apply_progression(load_game_config()["progression"])
 
     image_column, text_column = st.columns([1, 2], vertical_alignment="center")
     with image_column:
-        birthday_portrait = get_cached_portrait(GAME_CONFIG["name"])
-        if birthday_portrait:
-            st.image(birthday_portrait, width="stretch")
+        image_bytes = fetch_image_from_storage(GAME_CONFIG["name"])
+        if image_bytes:
+            st.image(BytesIO(image_bytes), width="stretch")
     with text_column:
         player_name = capitalize_name(GAME_CONFIG["name"])
         st.markdown(f"<div class='big-title'>{player_name}</div>", unsafe_allow_html=True)
