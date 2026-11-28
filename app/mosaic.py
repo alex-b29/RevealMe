@@ -18,9 +18,9 @@ def get_mosaic_dimensions(item_count: int) -> tuple[int, int]:
 
     candidates: list[tuple[int, int, int, int]] = []
 
-    for cols in range(1, item_count + 1):
-        for rows in range(1, cols + 1):
-            if item_count > 3 and rows == 1:
+    for rows in range(1, item_count + 1):
+        for cols in range(1, rows + 1):
+            if item_count > 3 and cols == 1:
                 continue
 
             cell_count = cols * rows
@@ -28,7 +28,7 @@ def get_mosaic_dimensions(item_count: int) -> tuple[int, int]:
                 continue
 
             extra = cell_count - item_count
-            difference = cols - rows
+            difference = rows - cols
             candidates.append((extra, difference, cols, rows))
 
     _, _, cols, rows = min(candidates)
