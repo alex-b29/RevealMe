@@ -4,12 +4,8 @@ import random
 from PIL import Image, ImageDraw, ImageOps
 
 
-def normalize(value: str) -> str:
-    return " ".join(value.strip().lower().split())
-
-
 def get_participant_color(name: str) -> tuple[int, int, int]:
-    digest = hashlib.sha256(normalize(name).encode("utf-8")).digest()
+    digest = hashlib.sha256(name.encode("utf-8")).digest()
     red = 110 + digest[0] % 126
     green = 110 + digest[1] % 126
     blue = 110 + digest[2] % 126
