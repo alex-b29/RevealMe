@@ -51,7 +51,10 @@ def reset_game() -> None:
     game_config["progression"] = {
         "started": False,
         "current_index": 0,
-        "mosaic_positions": build_mosaic_positions(len(ORDERED_PARTICIPANTS)),
+        "mosaic_positions": build_mosaic_positions(
+            len(ORDERED_PARTICIPANTS),
+            ORDERED_PARTICIPANTS,
+        ),
     }
     save_game_config(game_config)
     apply_progression(game_config["progression"])
@@ -59,10 +62,14 @@ def reset_game() -> None:
 
 def apply_progression(progression: dict) -> None:
     mosaic_positions = progression.get("mosaic_positions", [])
-    positions_need_repair = len(mosaic_positions) != len(ORDERED_PARTICIPANTS)
+    expected_positions = build_mosaic_positions(
+        len(ORDERED_PARTICIPANTS),
+        ORDERED_PARTICIPANTS,
+    )
+    positions_need_repair = mosaic_positions != expected_positions
 
     if positions_need_repair:
-        mosaic_positions = build_mosaic_positions(len(ORDERED_PARTICIPANTS))
+        mosaic_positions = expected_positions
         progression["mosaic_positions"] = mosaic_positions
         game_config = load_game_config()
         game_config["progression"] = progression

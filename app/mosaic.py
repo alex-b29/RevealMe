@@ -35,10 +35,19 @@ def get_mosaic_dimensions(item_count: int) -> tuple[int, int]:
     return cols, rows
 
 
-def build_mosaic_positions(item_count: int) -> list[int]:
+def build_mosaic_positions(
+    item_count: int,
+    participant_names: tuple[str, ...] | list[str] | None = None,
+) -> list[int]:
     cols, rows = get_mosaic_dimensions(item_count)
     total_cells = cols * rows
-    return random.sample(range(total_cells), item_count)
+
+    if participant_names is None:
+        return random.sample(range(total_cells), item_count)
+
+    seed_payload = "\0".join(participant_names).encode("utf-8")
+    seed = int.from_bytes(hashlib.sha256(seed_payload).digest(), "big")
+    return random.Random(seed).sample(range(total_cells), item_count)
 
 
 def get_mosaic_image(
