@@ -45,7 +45,7 @@ def build_mosaic_positions(
     if participant_names is None:
         return random.sample(range(total_cells), item_count)
 
-    seed_payload = "\0".join(participant_names).encode("utf-8")
+    seed_payload = ("birthday\0" + "\0".join(participant_names)).encode("utf-8")
     seed = int.from_bytes(hashlib.sha256(seed_payload).digest(), "big")
     return random.Random(seed).sample(range(total_cells), item_count)
 
